@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">H264Player</string>
+    <string name="start_record">AudioRecord</string>
+    <string name="start_play">AudioPlay</string>
+    <string name="stop_record">StopRecord</string>
+    <string name="stop_play">StopPlay</string>
+</resources>
