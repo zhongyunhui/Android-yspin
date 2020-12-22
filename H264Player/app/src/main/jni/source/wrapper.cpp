@@ -10,7 +10,6 @@
 
 
 
-
 static const JNINativeMethod gMethods[] = {
         {"connect","(/java/lang/String;)Z",(void*)NativeConnect},
         {"sendData","([BII)Z",(void*)NativeSendData}

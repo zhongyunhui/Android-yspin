@@ -4,4 +4,5 @@
     <string name="start_play">AudioPlay</string>
     <string name="stop_record">StopRecord</string>
     <string name="stop_play">StopPlay</string>
+    <string name="start_mux">start_mux</string>
 </resources>

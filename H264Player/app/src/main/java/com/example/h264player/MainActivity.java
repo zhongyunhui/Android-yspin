@@ -9,22 +9,36 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.MediaCodec;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.view.View;
 import android.widget.Button;
 
 import com.example.h264player.RecordAndPlay.RecordActivity;
 import com.example.h264player.ViewTest.ImageActivity;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    //muxtest:
+    private static String sdcard_path;
+    private MediaExtractor mediaExtractor;
+    private MediaMuxer mediaMuxer;
+    private Button btn_start;
 
-    private Button ViewTest,RecordTest;
+
+
+    private Button ViewTest,RecordTest,MuxTest;
     H264Player h264Player;
     private MediaProjection mediaProjection;
     private MediaProjectionManager mediaProjectionManager;
@@ -32,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.CAMERA,
     };
     private List<String> mPermissionList = new ArrayList<>();
     private static final int MY_PERMISSIONS_REQUEST = 1001;
@@ -39,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        sdcard_path=getExternalFilesDir(Environment.DIRECTORY_MUSIC).getPath();
         ButtonInit();
         checkPermissions();
 
@@ -76,6 +92,17 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
+        MuxTest=findViewById(R.id.goMux);
+        MuxTest.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                try{
+                    process();
+                }catch (IOException e){
+                    e.printStackTrace();
+                }
+            }
+        });
 
     }
 
@@ -96,5 +123,47 @@ public class MainActivity extends AppCompatActivity {
     }
     public void stopLive(View view){
 
+    }
+
+    private boolean process() throws IOException {
+        mediaExtractor=new MediaExtractor();
+        mediaExtractor.setDataSource(sdcard_path+"/xunlong.mp4");
+        int mVideoTrackIndex=-1;
+        int frameRate=0;//I帧出现的频率
+        for(int i=0;i<mediaExtractor.getTrackCount();i++){//getTrackCount返回通道数
+            MediaFormat mediaFormat=mediaExtractor.getTrackFormat(i);//获取i的通道格式
+            String mime=mediaFormat.getString(MediaFormat.KEY_MIME);
+            try {
+                if(mime.startsWith("video/")){
+                    frameRate=mediaFormat.getInteger(MediaFormat.KEY_FRAME_RATE);
+                    mediaExtractor.selectTrack(i);
+                    mediaMuxer=new MediaMuxer(sdcard_path+"/xunlong_1.mp4",MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+                    mVideoTrackIndex=mediaMuxer.addTrack(mediaFormat);//将mediaFormat存入
+                    mediaMuxer.start();
+                }
+            }catch (NullPointerException e){
+                e.printStackTrace();
+            }
+
+        }
+        if(mediaMuxer==null){
+            return false;
+        }
+        MediaCodec.BufferInfo info=new MediaCodec.BufferInfo();//申请一个空间
+        info.presentationTimeUs=0;
+        ByteBuffer buffer=ByteBuffer.allocate(500*1024);//500kb
+        int sampleSize=0;
+        while((sampleSize = mediaExtractor.readSampleData(buffer, 0))>0){
+            info.offset=0;
+            info.size=sampleSize;
+            info.flags=MediaCodec.BUFFER_FLAG_KEY_FRAME;
+            info.presentationTimeUs+=1000*1000/frameRate;
+            mediaMuxer.writeSampleData(mVideoTrackIndex,buffer,info);
+            mediaExtractor.advance();//读取下一帧数据
+        }
+        mediaExtractor.release();
+        mediaMuxer.stop();
+        mediaMuxer.release();
+        return true;
     }
 }
